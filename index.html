@@ -7,41 +7,131 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Document</title>
     <style>
-        canvas {
-            border: 1px solid black;
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
         }
     </style>
 </head>
 
 <body>
-    <canvas width="600px" height="500px"></canvas>
+
+
     <script>
-        var canvas = document.getElementsByTagName('canvas')[0];
-        var ctx = canvas.getContext('2d');
+        //1.创建画布
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const h = window.innerHeight;
+        const w = window.innerWidth;
+        canvas.height = h;
+        canvas.width = w;
+        document.body.appendChild(canvas);
 
-        //绘制扇形
-        var w = canvas.width;
-        var h = canvas.height;
-        var angle = Math.PI / 180;
-        var stratAngle = 0;
 
-        function getRound() {
-            for (var i = 0; i < 360; i++) {
-                var r = parseInt(Math.random() * 255);
-                var g = parseInt(Math.random() * 255);
-                var b = parseInt(Math.random() * 255);
-                ctx.beginPath();
-                ctx.moveTo(w / 2, h / 2);
-                ctx.arc(w / 2, h / 2, 150, stratAngle, angle * i);
-                ctx.closePath();
-                ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')'
-                ctx.fill();
-                stratAngle = angle * i;
-            }
+        //2.设置关于粒子运动变量限值
+        //2.1设置粒子之间的最大连线距离
+        const lineMax = 100;
+        //2.2设置粒子运动最大能超出画布的距离
+        const extDisMax = 5;
+        //2.3帧动画
+        const RAF = (function () {
+            return window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function (callback) {
+                window.setTimeout(callback, 1000 / 60);
+            };
+        })();
+
+        //3.获取当前的鼠标位置
+        const mouseDis = { x: null, y: null };
+        //3.1鼠标移动事件
+        window.onmousemove = e => {
+            e = e || window.event;
+            mouseDis.x = e.clientX - canvas.offsetLeft;
+            mouseDis.y = e.clientY - canvas.offsetTop;
+        }
+        window.onmouseout = e=>{
+            warea.x = null;
+            warea.y = null;
+        };
+
+
+        //4.生成粒子数组
+        const dots = [];
+        for (let i = 0; i < 250; i++) {
+            const x = Math.random() * canvas.width
+            const y = Math.random() * canvas.height;
+            //粒子运动的加速度
+            const xa = Math.random() * 2 - 1
+            const ya = Math.random() * 2 - 1
+
+            dots.push({
+                x,
+                y,
+                xa,
+                ya,
+            })
         }
 
-        setInterval(getRound,10);
+        //5.粒子的移动函数
+        const move = dot => {
+            dot.x += dot.xa;
+            dot.y += dot.ya;
 
+            //碰到边界变成方向的加速度
+            dot.xa *= (dot.x > canvas.width  || dot.x < 0) ? -1 : 1;
+            dot.ya *= (dot.y > canvas.height  || dot.y < 0) ? -1 : 1;
+
+            //描点
+
+            ctx.fillRect(dot.x - 0.5, dot.y - 0.5, 1, 1);
+        }
+
+        //6.粒子之间的连线函数
+        const bubLine = ndots => {
+            let ndot;
+            dots.forEach(function (dot) {
+                move(dot);
+                for (let i = 0; i < ndots.length; i++) {
+                    ndot = ndots[i];
+                    //6.1如果ndot刚好是当前的dot,那么不连线,跳过
+                    if (ndot === dot) continue;
+                    //6.2获取两个点x之间的距离和y之间的距离
+                    const xc = dot.x - ndot.x;
+                    const yc = dot.y - ndot.y;
+                    //6.3如果两个点x之间的距离或者y之间的距离大于最大连线距离,那么不连线,跳过
+                    if (xc > lineMax || yc > lineMax) continue;
+                    //6.4计算两个点之间的距离(直角三角形求斜边)
+                    const dis = Math.sqrt(xc * xc + yc * yc);
+                    //6.5如果两个点之间的距离大于最大的连线距离,那么不连线,跳过
+                    if (dis > lineMax) continue;
+                    //6.6 如果当前的点刚好是鼠标,那么向鼠标处连线
+                    if (ndot === mouseDis && dis < 200) {
+                        dot.x -= xc * 0.01;
+                        dot.y -= yc * 0.01;
+                    }
+                    //6.7计算距离比
+                    const radio = (lineMax - dis) / lineMax;
+                    //6.8两个点之间连线
+                    ctx.beginPath();
+                    ctx.lineWidth = radio / 2;
+                    ctx.moveTo(dot.x, dot.y);
+                    ctx.lineTo(ndot.x, ndot.y);
+                    ctx.strokeStyle = 'rgba(0,0,0,' + (radio + 0.2) + ')';
+                    ctx.stroke();
+                }
+                ndots.splice(ndots.indexOf(dot), 1);
+            })
+        }
+
+        //7.浏览器帧动画
+        const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            bubLine([mouseDis].concat(dots));
+            RAF(animate);
+        }
+        setTimeout(animate, 100);
 
     </script>
 </body>
